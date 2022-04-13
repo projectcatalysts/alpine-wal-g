@@ -83,12 +83,21 @@ function build {
     # Configure the build environment if it hasn't been configured already
     source "${PROCAT_BUILD_LIBRARY_PATH}/set_build_env.sh"
 
-    # For testing purposes, default the package version
+    # For testing purposes, default the package name
 	if [ -z "${1-}" ]; then
+        local package_name=registry.projectcatalysts.com/procat/docker/wal-g
+        log "package_name    : Not specified, defaulting to $package_name"
+	else
+		local package_name=${1}
+        log "package_name    : $package_name"
+    fi
+
+   	# For testing purposes, default the package version
+	if [ -z "${2-}" ]; then
         local package_version=1.1
         log "package_version : Not specified, defaulting to $package_version"
 	else
-		local package_version=${1}
+		local package_version=${2}
         log "package_version : $package_version"
     fi
 
@@ -103,6 +112,7 @@ function build {
 	build_wal_g ${no_cache_flag} ${package_version} latest
 }
 
-# $1 : (Mandatory) Package Version (e.g. 1.1)
-# $2 : (Optional) --no-cache
-build ${1:-} ${2:-}
+# $1 : (Mandatory) Package Name (registry.projectcatalysts.com/procat/wal-g)
+# $2 : (Mandatory) Package Version (e.g. 1.1)
+# $3 : (Optional) --no-cache
+build ${1:-} ${2:-} ${3:-}
