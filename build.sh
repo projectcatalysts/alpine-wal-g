@@ -24,8 +24,7 @@ function build_wal_g {
     )
     local readonly container_options="${container_option_array[*]}"
 
-    # No longer required now that we are using a volume to pass the source to the container
-    # (this is required in order to get the build artefacts)
+    # Script to build wal-g in an alpine linux container
     local readonly container_commands_array=(
         "cd /src"
         "echo Installing packages..."
@@ -89,7 +88,7 @@ function build {
     #
     configure_ci_environment || return $?
 
-    # For testing purposes, default the package name
+    # Default the package name
 	if [ -z "${1-}" ]; then
         local package_name=${PROCAT_CI_REGISTRY_SERVER}/procat/docker/wal-g
         pc_log "package_name (default)           : $package_name"
@@ -98,7 +97,7 @@ function build {
         pc_log "package_name                     : $package_name"
     fi
 
-    # For testing purposes, default the package version
+    # Default the package version
 	if [ -z "${2-}" ]; then
         local package_version="2.0.1"
         pc_log "package_version (default)        : $package_version"
