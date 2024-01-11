@@ -1,7 +1,4 @@
-#!/bin/bash
-
-# Exit on command failure / unset variable
-set -eu
+#!/bin/bash -eu
 
 function build_wal_g {
     local readonly no_cache_flag=${1}
@@ -9,9 +6,9 @@ function build_wal_g {
     local readonly package_is_latest=${3:-}
 
     # Initialise docker passwords
-    use_docker
+    procat_ci_docker_init
 
-    local readonly build_container_image="registry.projectcatalysts.com/procat/docker/alpine-golang:latest"
+    local readonly build_container_image="${PROCAT_CI_REGISTRY_SERVER}/procat/docker/alpine-golang:latest"
 
     # Docker parameters: 
     # --attach  : Attach to STDIN, STDOUT or STDERR
@@ -21,9 +18,9 @@ function build_wal_g {
     local readonly container_option_array=(
         "-t"
         "--workdir /src"
-        "-v ${PROCAT_BUILD_DOWNLOAD_PATH}:/downloads"
-        "-v ${PROCAT_BUILD_SCRIPT_PATH}:/src/wal-g"
-        "-e PROCAT_BUILD_DOWNLOAD_PATH=/downloads"
+        "-v ${PROCAT_CI_DOWNLOAD_PATH}:/downloads"
+        "-v ${EXEC_CI_SCRIPT_PATH}:/src/wal-g"
+        "-e PROCAT_CI_DOWNLOAD_PATH=/downloads"
     )
     local readonly container_options="${container_option_array[*]}"
 
@@ -33,7 +30,7 @@ function build_wal_g {
         "cd /src"
         "echo Installing packages..."
 		"apk update"
-		"apk add make cmake lzo-dev libsodium"
+		"apk add alpine-sdk make cmake lzo-dev libsodium"
         "echo Cloning modules..."
         "cd /src/wal-g"
         "git clone --depth 1 --recurse-submodules --branch v${package_version} https://github.com/wal-g/wal-g.git /src/v${package_version}"
@@ -45,7 +42,7 @@ function build_wal_g {
     )
     container_commands=$( _TMP=$(IFS=$'\n' ; echo "${container_commands_array[*]}"); echo ${_TMP//$'\n'/' && '})
 
-    log "Container Image   : ${build_container_image}"
+    pc_log "Container Image   : ${build_container_image}"
     echo "--------------------"
     echo "Container Options :"
     echo "--------------------"
@@ -56,50 +53,60 @@ function build_wal_g {
     echo "$(IFS=$'\n' ; echo "${container_commands_array[*]}")"
     echo "--------------------"
 
-    log "Executing docker run....."
+    pc_log "Executing docker run....."
     docker run ${container_options} ${build_container_image} /bin/bash -c "${container_commands}"
     local readonly docker_return_code=$?
 
     if [ ${docker_return_code} -eq 0 ]; then
-        log "SUCCESS : Docker run completed successfully"
+        pc_log "SUCCESS : Docker run completed successfully"
     else
-        log "ERROR : Docker run returned an error: ${docker_return_code}"
+        pc_log "ERROR : Docker run returned an error: ${docker_return_code}"
         exit ${docker_return_code}
     fi
 }
 
-function build {
-
+# configure_ci_environment is used to configure the CI environment variables
+function configure_ci_environment {
+    #
     # Check the pre-requisite environment variables have been set
-    if [ -z ${PROCAT_BUILD_LIBRARY_PATH+x} ]; then
-        echo "ERROR: PROCAT_BUILD_LIBRARY_PATH has not been set!"
-        exit 1
+    # PROCAT_CI_SCRIPTS_PATH would typically be set in .bashrc or .profile
+    # 
+    if [ -z ${PROCAT_CI_SCRIPTS_PATH+x} ]; then
+        echo "ERROR: A required CI environment variable has not been set : PROCAT_CI_SCRIPTS_PATH"
+        echo "       Has '~/.procat_ci_env.sh' been sourced into ~/.bashrc or ~/.profile?"
+        env | grep "PROCAT_CI"
+        return 1
     fi
 
-    # Set the script name and path
-    PROCAT_BUILD_SCRIPT_NAME="${BASH_SOURCE[0]##*/}"
-    PROCAT_BUILD_SCRIPT_PATH="$(dirname "$(realpath "${PROCAT_BUILD_SCRIPT_NAME}")" )"
-
     # Configure the build environment if it hasn't been configured already
-    source "${PROCAT_BUILD_LIBRARY_PATH}/set_build_env.sh"
+    source "${PROCAT_CI_SCRIPTS_PATH}/set_ci_env.sh"
+}
+
+function build {
+    #
+    # configure_ci_environment is used to configure the CI environment variables
+    # and load the CI common functions
+    #
+    configure_ci_environment || return $?
 
     # For testing purposes, default the package name
 	if [ -z "${1-}" ]; then
-        local package_name=registry.projectcatalysts.com/procat/docker/wal-g
-        log "package_name    : Not specified, defaulting to $package_name"
+        local package_name=${PROCAT_CI_REGISTRY_SERVER}/procat/docker/wal-g
+        pc_log "package_name (default)           : $package_name"
 	else
 		local package_name=${1}
-        log "package_name    : $package_name"
+        pc_log "package_name                     : $package_name"
     fi
 
-   	# For testing purposes, default the package version
+    # For testing purposes, default the package version
 	if [ -z "${2-}" ]; then
-        local package_version=1.1
-        log "package_version : Not specified, defaulting to $package_version"
+        local package_version="2.0.1"
+        pc_log "package_version (default)        : $package_version"
 	else
 		local package_version=${2}
-        log "package_version : $package_version"
+        pc_log "package_version                  : $package_version"
     fi
+    pc_log ""
 
 	# Determine whether the --no-cache command line option has been specified.
 	# If it has, attempts to download files from the internet are always made.

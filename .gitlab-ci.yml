@@ -1,9 +1,9 @@
 include:
-  project: 'procat/gitlab-ci-scripts'
-  file: '.procat-build.yml'
+  project: 'procat/ci-scripts'
+  file: '.gitlab-common.yml'
 
 build:
-  extends: .procat-build
+  extends: .gitlab-build
   artifacts:
     paths:
       - bin/wal-g
